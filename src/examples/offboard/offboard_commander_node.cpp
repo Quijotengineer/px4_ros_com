@@ -92,6 +92,14 @@ public:
 				});
 
 		offboard_setpoint_counter_ = 0;
+
+        // Define takeoff pose
+        next_trajectory_setpoint_msg.timestamp = timestamp_.load();
+        next_trajectory_setpoint_msg.x = 0.0;
+        next_trajectory_setpoint_msg.y = 0.0;
+        next_trajectory_setpoint_msg.z = -1.0;
+        next_trajectory_setpoint_msg.yaw = -3.14; // [-PI:PI]
+
         /* The above is the main loop spining on the ROS 2 node. It first sends 10 setpoint
          * messages before sending the command to change to offboard mode At the same time,
          * both offboard_control_mode and trajectory_setpoint messages are sent to the flight controller. */
@@ -108,24 +116,19 @@ public:
 
             // offboard_control_mode needs to be paired with trajectory_setpoint
 			publish_offboard_control_mode();
-            
+            trajectory_setpoint_publisher_->publish(next_trajectory_setpoint_msg);
 
            	// stop the counter after reaching 11
 			if (offboard_setpoint_counter_ < 11) {
 				offboard_setpoint_counter_++;
-                takeoff();
 			}
-            else // if everything is okay (if (current_state.armed && current_state.mode == "OFFBOARD")):
-            {
-                trajectory_setpoint_publisher_->publish(next_trajectory_setpoint_msg);
-            }
+
 		};
 		timer_ = this->create_wall_timer(33ms, timer_callback);
 	}
 
 	void arm() const;
 	void disarm() const;
-    void takeoff() const;
 
 private:
 	rclcpp::TimerBase::SharedPtr timer_;
@@ -147,6 +150,28 @@ private:
     px4_msgs::msg::TrajectorySetpoint next_trajectory_setpoint_msg;
 };
 
+/**
+ * @brief Publish vehicle commands
+ * @param command   Command code (matches VehicleCommand and MAVLink MAV_CMD codes)
+ * @param param1    Command parameter 1
+ * @param param2    Command parameter 2
+ */
+void OffboardCommander::publish_vehicle_command(uint16_t command, float param1,
+					      float param2) const {
+	VehicleCommand msg{};
+	msg.timestamp = timestamp_.load();
+	msg.param1 = param1;
+	msg.param2 = param2;
+	msg.command = command;
+	msg.target_system = 1;
+	msg.target_component = 1;
+	msg.source_system = 1;
+	msg.source_component = 1;
+	msg.from_external = true;
+
+	vehicle_command_publisher_->publish(msg);
+}
+
 
 /**
  * @brief Send a command to Arm the vehicle
@@ -165,18 +190,6 @@ void OffboardCommander::disarm() const {
 	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
 
 	RCLCPP_INFO(this->get_logger(), "Disarm command send");
-}
-
-
-void OffboardCommander::takeoff() const {
-	TrajectorySetpoint msg{};
-	msg.timestamp = timestamp_.load();
-	msg.x = 0.0;
-	msg.y = 0.0;
-	msg.z = -1.0;
-	msg.yaw = -3.14; // [-PI:PI]
-
-	trajectory_setpoint_publisher_->publish(msg);
 }
 
 
@@ -213,29 +226,8 @@ void OffboardCommander::update_target_setpoint_cb(const geometry_msgs::msg::Pose
 	next_trajectory_setpoint_msg.z = -msg->pose.position.z; // ENU (ROS) to NED (PX4)
 	next_trajectory_setpoint_msg.yaw = -3.14; // [-PI:PI]
 
-}
+    std::cout << "Updated next target setpoint" << std::endl;
 
-
-/**
- * @brief Publish vehicle commands
- * @param command   Command code (matches VehicleCommand and MAVLink MAV_CMD codes)
- * @param param1    Command parameter 1
- * @param param2    Command parameter 2
- */
-void OffboardCommander::publish_vehicle_command(uint16_t command, float param1,
-					      float param2) const {
-	VehicleCommand msg{};
-	msg.timestamp = timestamp_.load();
-	msg.param1 = param1;
-	msg.param2 = param2;
-	msg.command = command;
-	msg.target_system = 1;
-	msg.target_component = 1;
-	msg.source_system = 1;
-	msg.source_component = 1;
-	msg.from_external = true;
-
-	vehicle_command_publisher_->publish(msg);
 }
 
 
@@ -249,4 +241,3 @@ int main(int argc, char* argv[]) {
 	rclcpp::shutdown();
 	return 0;
 }
-// int main(){return 0;}
