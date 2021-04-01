@@ -60,193 +60,193 @@ using namespace std::chrono;
 using namespace std::chrono_literals;
 using namespace px4_msgs::msg;
 
-// class OffboardCommander : public rclcpp::Node {
-// public:
-// 	OffboardCommander() : Node("offboard_commander_node") {
-// #ifdef ROS_DEFAULT_API
-// 		offboard_control_mode_publisher_ =
-// 			this->create_publisher<OffboardControlMode>("OffboardControlMode_PubSubTopic", 10);
-// 		trajectory_setpoint_publisher_ =
-// 			this->create_publisher<TrajectorySetpoint>("TrajectorySetpoint_PubSubTopic", 10);
-// 		vehicle_command_publisher_ =
-// 			this->create_publisher<VehicleCommand>("VehicleCommand_PubSubTopic", 10);
-// #else
-// 		offboard_control_mode_publisher_ =
-// 			this->create_publisher<OffboardControlMode>("OffboardControlMode_PubSubTopic");
-// 		trajectory_setpoint_publisher_ =
-// 		 	this->create_publisher<TrajectorySetpoint>("TrajectorySetpoint_PubSubTopic");
-// 		vehicle_command_publisher_ =
-// 			this->create_publisher<VehicleCommand>("VehicleCommand_PubSubTopic");
-// #endif
+class OffboardCommander : public rclcpp::Node {
+public:
+	OffboardCommander() : Node("offboard_commander_node") {
+#ifdef ROS_DEFAULT_API
+		offboard_control_mode_publisher_ =
+			this->create_publisher<OffboardControlMode>("OffboardControlMode_PubSubTopic", 10);
+		trajectory_setpoint_publisher_ =
+			this->create_publisher<TrajectorySetpoint>("TrajectorySetpoint_PubSubTopic", 10);
+		vehicle_command_publisher_ =
+			this->create_publisher<VehicleCommand>("VehicleCommand_PubSubTopic", 10);
+#else
+		offboard_control_mode_publisher_ =
+			this->create_publisher<OffboardControlMode>("OffboardControlMode_PubSubTopic");
+		trajectory_setpoint_publisher_ =
+		 	this->create_publisher<TrajectorySetpoint>("TrajectorySetpoint_PubSubTopic");
+		vehicle_command_publisher_ =
+			this->create_publisher<VehicleCommand>("VehicleCommand_PubSubTopic");
+#endif
 
-//         target_trajectory_setpoint_subscriber_ = 
-//             this->create_subscription<geometry_msgs::msg::PoseStamped>("osd/next_trajectory_setpoint",
-//                  1, std::bind(&OffboardCommander::update_target_setpoint_cb, this, std::placeholders::_1));
+        target_trajectory_setpoint_subscriber_ = 
+            this->create_subscription<geometry_msgs::msg::PoseStamped>("osd/next_trajectory_setpoint",
+                 1, std::bind(&OffboardCommander::update_target_setpoint_cb, this, std::placeholders::_1));
 
-// 		/* Obtain a syncronized timestamp to be set and sent with the offboard_control_mode
-//          * and trajectory_setpoint messages. */
-// 		timesync_sub_ =
-// 			this->create_subscription<px4_msgs::msg::Timesync>("Timesync_PubSubTopic", 10,
-// 				[this](const px4_msgs::msg::Timesync::UniquePtr msg) {
-// 					timestamp_.store(msg->timestamp);
-// 				});
+		/* Obtain a syncronized timestamp to be set and sent with the offboard_control_mode
+         * and trajectory_setpoint messages. */
+		timesync_sub_ =
+			this->create_subscription<px4_msgs::msg::Timesync>("Timesync_PubSubTopic", 10,
+				[this](const px4_msgs::msg::Timesync::UniquePtr msg) {
+					timestamp_.store(msg->timestamp);
+				});
 
-// 		offboard_setpoint_counter_ = 0;
-//         /* The above is the main loop spining on the ROS 2 node. It first sends 10 setpoint
-//          * messages before sending the command to change to offboard mode At the same time,
-//          * both offboard_control_mode and trajectory_setpoint messages are sent to the flight controller. */
-// 		auto timer_callback = [this]() -> void {
+		offboard_setpoint_counter_ = 0;
+        /* The above is the main loop spining on the ROS 2 node. It first sends 10 setpoint
+         * messages before sending the command to change to offboard mode At the same time,
+         * both offboard_control_mode and trajectory_setpoint messages are sent to the flight controller. */
+		auto timer_callback = [this]() -> void {
 
-//             // Change to Offboard mode after 10 setpoints
-// 			if (offboard_setpoint_counter_ == 10) {
+            // Change to Offboard mode after 10 setpoints
+			if (offboard_setpoint_counter_ == 10) {
 				
-// 				this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+				this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 
-// 				// Arm the vehicle
-// 				this->arm();
-// 			}
+				// Arm the vehicle
+				this->arm();
+			}
 
-//             // offboard_control_mode needs to be paired with trajectory_setpoint
-// 			publish_offboard_control_mode();
+            // offboard_control_mode needs to be paired with trajectory_setpoint
+			publish_offboard_control_mode();
             
 
-//            	// stop the counter after reaching 11
-// 			if (offboard_setpoint_counter_ < 11) {
-// 				offboard_setpoint_counter_++;
-//                 takeoff();
-// 			}
-//             else // if everything is okay (if (current_state.armed && current_state.mode == "OFFBOARD")):
-//             {
-//                 trajectory_setpoint_publisher_->publish(next_trajectory_setpoint_msg);
-//             }
-// 		};
-// 		timer_ = this->create_wall_timer(33ms, timer_callback);
-// 	}
+           	// stop the counter after reaching 11
+			if (offboard_setpoint_counter_ < 11) {
+				offboard_setpoint_counter_++;
+                takeoff();
+			}
+            else // if everything is okay (if (current_state.armed && current_state.mode == "OFFBOARD")):
+            {
+                trajectory_setpoint_publisher_->publish(next_trajectory_setpoint_msg);
+            }
+		};
+		timer_ = this->create_wall_timer(33ms, timer_callback);
+	}
 
-// 	void arm() const;
-// 	void disarm() const;
-//     void takeoff() const;
+	void arm() const;
+	void disarm() const;
+    void takeoff() const;
 
-// private:
-// 	rclcpp::TimerBase::SharedPtr timer_;
+private:
+	rclcpp::TimerBase::SharedPtr timer_;
 
-// 	rclcpp::Publisher<OffboardControlMode>::SharedPtr offboard_control_mode_publisher_;
-// 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_setpoint_publisher_;
-// 	rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_command_publisher_;
-// 	rclcpp::Subscription<px4_msgs::msg::Timesync>::SharedPtr timesync_sub_;
-//     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr target_trajectory_setpoint_subscriber_;
+	rclcpp::Publisher<OffboardControlMode>::SharedPtr offboard_control_mode_publisher_;
+	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_setpoint_publisher_;
+	rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_command_publisher_;
+	rclcpp::Subscription<px4_msgs::msg::Timesync>::SharedPtr timesync_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr target_trajectory_setpoint_subscriber_;
 
-// 	std::atomic<uint64_t> timestamp_;   //!< common synced timestamped
+	std::atomic<uint64_t> timestamp_;   //!< common synced timestamped
 
-// 	uint64_t offboard_setpoint_counter_;   //!< counter for the number of setpoints sent
+	uint64_t offboard_setpoint_counter_;   //!< counter for the number of setpoints sent
 
-// 	void publish_offboard_control_mode() const;
-// 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0) const;
-//     void update_target_setpoint_cb (const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+	void publish_offboard_control_mode() const;
+	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0) const;
+    void update_target_setpoint_cb (const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 
-//     px4_msgs::msg::TrajectorySetpoint next_trajectory_setpoint_msg;
-// };
-
-
-// /**
-//  * @brief Send a command to Arm the vehicle
-//  */
-// void OffboardCommander::arm() const {
-// 	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
-
-// 	RCLCPP_INFO(this->get_logger(), "Arm command send");
-// }
+    px4_msgs::msg::TrajectorySetpoint next_trajectory_setpoint_msg;
+};
 
 
-// /**
-//  * @brief Send a command to Disarm the vehicle
-//  */
-// void OffboardCommander::disarm() const {
-// 	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
+/**
+ * @brief Send a command to Arm the vehicle
+ */
+void OffboardCommander::arm() const {
+	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
 
-// 	RCLCPP_INFO(this->get_logger(), "Disarm command send");
-// }
-
-
-// void OffboardCommander::takeoff() const {
-// 	TrajectorySetpoint msg{};
-// 	msg.timestamp = timestamp_.load();
-// 	msg.x = 0.0;
-// 	msg.y = 0.0;
-// 	msg.z = -1.0;
-// 	msg.yaw = -3.14; // [-PI:PI]
-
-// 	trajectory_setpoint_publisher_->publish(msg);
-// }
+	RCLCPP_INFO(this->get_logger(), "Arm command send");
+}
 
 
-// /**
-//  * @brief Publish the offboard control mode.
-//  *        For this example, only position and altitude controls are active.
-//  */
+/**
+ * @brief Send a command to Disarm the vehicle
+ */
+void OffboardCommander::disarm() const {
+	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
 
-// void OffboardCommander::publish_offboard_control_mode() const {
-// 	OffboardControlMode msg{};
-// 	msg.timestamp = timestamp_.load();
-// 	msg.position = true;
-// 	msg.velocity = false;
-// 	msg.acceleration = false;
-// 	msg.attitude = false;
-// 	msg.body_rate = false;
-
-// 	offboard_control_mode_publisher_->publish(msg);
-// }
+	RCLCPP_INFO(this->get_logger(), "Disarm command send");
+}
 
 
-// /**
-//  * The position is already being published in the NED coordinate frame for simplicity,
-//  * but in the case of the user wanting to subscribe to data coming from other nodes,
-//  * and since the standard frame of reference in ROS/ROS 2 is ENU, the user can use
-//  * the available helper functions in the frame_transform library.
-// */
-// void OffboardCommander::update_target_setpoint_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+void OffboardCommander::takeoff() const {
+	TrajectorySetpoint msg{};
+	msg.timestamp = timestamp_.load();
+	msg.x = 0.0;
+	msg.y = 0.0;
+	msg.z = -1.0;
+	msg.yaw = -3.14; // [-PI:PI]
 
-// 	next_trajectory_setpoint_msg.timestamp = timestamp_.load();
-//     // Needs converting frames
-// 	next_trajectory_setpoint_msg.x = msg->pose.position.x;
-// 	next_trajectory_setpoint_msg.y = msg->pose.position.y;
-// 	next_trajectory_setpoint_msg.z = -msg->pose.position.z; // ENU (ROS) to NED (PX4)
-// 	next_trajectory_setpoint_msg.yaw = -3.14; // [-PI:PI]
-
-// }
+	trajectory_setpoint_publisher_->publish(msg);
+}
 
 
-// /**
-//  * @brief Publish vehicle commands
-//  * @param command   Command code (matches VehicleCommand and MAVLink MAV_CMD codes)
-//  * @param param1    Command parameter 1
-//  * @param param2    Command parameter 2
-//  */
-// void OffboardCommander::publish_vehicle_command(uint16_t command, float param1,
-// 					      float param2) const {
-// 	VehicleCommand msg{};
-// 	msg.timestamp = timestamp_.load();
-// 	msg.param1 = param1;
-// 	msg.param2 = param2;
-// 	msg.command = command;
-// 	msg.target_system = 1;
-// 	msg.target_component = 1;
-// 	msg.source_system = 1;
-// 	msg.source_component = 1;
-// 	msg.from_external = true;
+/**
+ * @brief Publish the offboard control mode.
+ *        For this example, only position and altitude controls are active.
+ */
 
-// 	vehicle_command_publisher_->publish(msg);
-// }
+void OffboardCommander::publish_offboard_control_mode() const {
+	OffboardControlMode msg{};
+	msg.timestamp = timestamp_.load();
+	msg.position = true;
+	msg.velocity = false;
+	msg.acceleration = false;
+	msg.attitude = false;
+	msg.body_rate = false;
+
+	offboard_control_mode_publisher_->publish(msg);
+}
 
 
+/**
+ * The position is already being published in the NED coordinate frame for simplicity,
+ * but in the case of the user wanting to subscribe to data coming from other nodes,
+ * and since the standard frame of reference in ROS/ROS 2 is ENU, the user can use
+ * the available helper functions in the frame_transform library.
+*/
+void OffboardCommander::update_target_setpoint_cb(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
 
-// int main(int argc, char* argv[]) {
-// 	std::cout << "Starting offboard control node..." << std::endl;
-// 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
-// 	rclcpp::init(argc, argv);
-// 	rclcpp::spin(std::make_shared<OffboardCommander>());
+	next_trajectory_setpoint_msg.timestamp = timestamp_.load();
+    // Needs converting frames
+	next_trajectory_setpoint_msg.x = msg->pose.position.x;
+	next_trajectory_setpoint_msg.y = msg->pose.position.y;
+	next_trajectory_setpoint_msg.z = -msg->pose.position.z; // ENU (ROS) to NED (PX4)
+	next_trajectory_setpoint_msg.yaw = -3.14; // [-PI:PI]
 
-// 	rclcpp::shutdown();
-// 	return 0;
-// }
-int main(){return 0;}
+}
+
+
+/**
+ * @brief Publish vehicle commands
+ * @param command   Command code (matches VehicleCommand and MAVLink MAV_CMD codes)
+ * @param param1    Command parameter 1
+ * @param param2    Command parameter 2
+ */
+void OffboardCommander::publish_vehicle_command(uint16_t command, float param1,
+					      float param2) const {
+	VehicleCommand msg{};
+	msg.timestamp = timestamp_.load();
+	msg.param1 = param1;
+	msg.param2 = param2;
+	msg.command = command;
+	msg.target_system = 1;
+	msg.target_component = 1;
+	msg.source_system = 1;
+	msg.source_component = 1;
+	msg.from_external = true;
+
+	vehicle_command_publisher_->publish(msg);
+}
+
+
+
+int main(int argc, char* argv[]) {
+	std::cout << "Starting offboard control node..." << std::endl;
+	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+	rclcpp::init(argc, argv);
+	rclcpp::spin(std::make_shared<OffboardCommander>());
+
+	rclcpp::shutdown();
+	return 0;
+}
+// int main(){return 0;}
