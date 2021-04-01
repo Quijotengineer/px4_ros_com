@@ -47,6 +47,8 @@ find_package(px4_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
+find_package(std_msgs REQUIRED) ## OSD
+
 find_package(PythonInterp 3 REQUIRED)
 if(ROS_DISTRO IN_LIST ROS_DISTROS)
   find_package(eigen3_cmake_module REQUIRED)
@@ -69,10 +71,14 @@ include_directories(include)
 
 function(custom_executable subfolder target)
   add_executable(${target} src/${subfolder}/${target}.cpp)
+
   ament_target_dependencies(${target}
     rclcpp
     px4_msgs
+    std_msgs
+    geometry_msgs
   )
+
   install(TARGETS ${target}
   DESTINATION lib/${PROJECT_NAME})
 endfunction()
@@ -104,9 +110,9 @@ custom_executable(examples/offboard offboard_commander_node)
 
 # Export information to downstream packages
 if(ROS_DISTRO IN_LIST ROS_DISTROS)
-  ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime eigen3_cmake_module Eigen3 px4_msgs geometry_msgs sensor_msgs)
+  ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime eigen3_cmake_module Eigen3 px4_msgs geometry_msgs sensor_msgs std_msgs) ## OSD
 else()
-  ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime Eigen3 px4_msgs geometry_msgs sensor_msgs)
+  ament_export_dependencies(ament_cmake rclcpp rosidl_default_runtime Eigen3 px4_msgs geometry_msgs sensor_msgs std_msgs)
 endif()
 if (ROS_DISTRO IN_LIST USES_DEPRECATED_EXPORT_API)
   ament_export_interfaces(export_frame_transforms HAS_LIBRARY_TARGET)
