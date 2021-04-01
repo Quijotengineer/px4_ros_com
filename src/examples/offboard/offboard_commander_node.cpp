@@ -99,13 +99,15 @@ public:
         next_trajectory_setpoint_msg.y = 0.0;
         next_trajectory_setpoint_msg.z = -1.0;
         next_trajectory_setpoint_msg.yaw = -3.14; // [-PI:PI]
+		std::cout << "Defined initial trajectory setpoint (x, y, z, yaw): " << next_trajectory_setpoint_msg.x << 
+		next_trajectory_setpoint_msg.y << next_trajectory_setpoint_msg.z << next_trajectory_setpoint_msg.yaw << std::endl;
 
         /* The above is the main loop spining on the ROS 2 node. It first sends 10 setpoint
          * messages before sending the command to change to offboard mode At the same time,
          * both offboard_control_mode and trajectory_setpoint messages are sent to the flight controller. */
 		auto timer_callback = [this]() -> void {
-
-            // Change to Offboard mode after 10 setpoints
+			
+			// Change to Offboard mode after 10 setpoints
 			if (offboard_setpoint_counter_ == 10) {
 				
 				this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
@@ -116,12 +118,14 @@ public:
 
             // offboard_control_mode needs to be paired with trajectory_setpoint
 			publish_offboard_control_mode();
-            trajectory_setpoint_publisher_->publish(next_trajectory_setpoint_msg);
+			publish_trajectory_setpoint(); // should be doable with:
+            // trajectory_setpoint_publisher_->publish(next_trajectory_setpoint_msg);
 
            	// stop the counter after reaching 11
 			if (offboard_setpoint_counter_ < 11) {
 				offboard_setpoint_counter_++;
 			}
+
 
 		};
 		timer_ = this->create_wall_timer(33ms, timer_callback);
@@ -146,6 +150,8 @@ private:
 	void publish_offboard_control_mode() const;
 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0) const;
     void update_target_setpoint_cb (const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+	void takeoff() const;
+	void publish_trajectory_setpoint();
 
     px4_msgs::msg::TrajectorySetpoint next_trajectory_setpoint_msg;
 };
@@ -226,8 +232,19 @@ void OffboardCommander::update_target_setpoint_cb(const geometry_msgs::msg::Pose
 	next_trajectory_setpoint_msg.z = -msg->pose.position.z; // ENU (ROS) to NED (PX4)
 	next_trajectory_setpoint_msg.yaw = -3.14; // [-PI:PI]
 
-    std::cout << "Updated next target setpoint" << std::endl;
+	RCLCPP_INFO(this->get_logger(), "Updated next target trajectory setpoint");
+}
 
+
+void OffboardCommander::publish_trajectory_setpoint() {
+	TrajectorySetpoint msg{};
+	msg.timestamp = timestamp_.load();
+	msg.x = next_trajectory_setpoint_msg.x;
+	msg.y = next_trajectory_setpoint_msg.y;
+	msg.z = next_trajectory_setpoint_msg.z;
+	msg.yaw = next_trajectory_setpoint_msg.yaw; // [-PI:PI]
+
+	trajectory_setpoint_publisher_->publish(msg);
 }
 
 
